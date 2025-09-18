@@ -56,7 +56,7 @@ const Activity = sequelize.define("activity", {
     allowNull: false,
     require: true,
     match: [
-      /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
+      /^\w+([.-]?\w+)@\w+([.-]?\w+)(\.\w{2,3})+$/,
       "please enter a valid email address",
     ],
   },

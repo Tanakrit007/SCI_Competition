@@ -1,39 +1,57 @@
 import jwt from "jsonwebtoken";
-import db from "../models/index.js";
-import authconfig from "../config/auth.config.js";
+import config from "../config/auth.config.js";
+import db from "../model/db.js";
 
-const User = db.User;
-
+// ตรวจสอบ token
 const verifyToken = (req, res, next) => {
   let token = req.headers["x-access-token"];
-  if (!token) {
-    return res.status(403).send({ message: "No token provided!" });
-  }
-  jwt.verify(token, authconfig.secret, (err, decoded) => {
-    if (err) {
-      return res.status(401).send({ message: "Unauthorized!" });
+  if (!token && req.headers.authorization) {
+    const parts = req.headers.authorization.split(" ");
+    if (parts.length === 2 && parts[0] === "Bearer") {
+      token = parts[1];
     }
-    req.userId = decoded.id;
+  }
+
+  if (!token) return res.status(403).send({ message: "No token provided!" });
+
+  jwt.verify(token, config.secret, (err, decoded) => {
+    if (err) return res.status(401).send({ message: "Unauthorized!" });
     req.username = decoded.username;
     next();
   });
 };
 
-const IsAdmin = async (req, res, next) => {
-  try {
-    const user = await User.findByPk(req.userId);
-    if (!user) return res.status(404).send({ message: "User not found!" });
-    const roles = await user.getRoles();
-    for (let i = 0; i < roles.length; i++) {
-      if (roles[i].name === "admin") {
-        return next();
-      }
-    }
-    return res.status(401).send({ message: "Require Admin Role!" });
-  } catch (err) {
-    return res.status(500).send({ message: err.message });
-  }
+// ตรวจสอบ role admin
+const isAdmin = (req, res, next) => {
+  db.user.findByPk(req.username).then(user => {
+    user.getRoles().then(roles => {
+      if (roles.some(r => r.name === "admin")) next();
+      else res.status(403).send({ message: "Require Admin Role!" });
+    });
+  });
 };
 
-const authjwt = { verifyToken, IsAdmin };
-export default authjwt;
+// ตรวจสอบ owner ของร้าน หรือ admin
+const isOwnerOrAdmin = (req, res, next) => {
+  const restaurantId = req.params.id;
+  db.restaurant.findByPk(restaurantId).then(restaurant => {
+    if (!restaurant) return res.status(404).send({ message: "Restaurant not found" });
+
+    if (restaurant.userId === req.username) {
+      next(); // เจ้าของร้าน
+    } else {
+      db.user.findByPk(req.username).then(user => {
+        user.getRoles().then(roles => {
+          if (roles.some(r => r.name === "admin")) next();
+          else res.status(403).send({ message: "Not authorized" });
+        });
+      });
+    }
+  });
+};
+
+export default {
+  verifyToken,
+  isAdmin,
+  isOwnerOrAdmin,
+};

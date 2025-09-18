@@ -1,12 +1,11 @@
-import authController from '../controllers/auth.controllers.js';
-import express from 'express';
+import express from "express";
+import authController from "../controllers/auth.controllers.js";
+
 const router = express.Router();
+router.post("/register", authController.signup);
 
-// POST http://localhost:5000/api/v1/auth/register
-router.post('/register', authController.register);
+router.get("/verify-email/:token", authController.verificationEmail);
 
-// POST http://localhost:5000/api/v1/auth/signin
-router.post('/signin', authController.signin);
+router.post("/signin", authController.signin);
 
 export default router;
-
