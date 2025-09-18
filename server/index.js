@@ -1,46 +1,58 @@
-import express from "express";
+import express from 'express'
+import dotenv from 'dotenv'
+import restaurantRoutes from './Routes/restaurant.routes.js';
+import authRoutes from './Routes/auth.routes.js';
+import cors from 'cors';
+import db from './model/index.js';
+
+dotenv.config()
 const app = express();
-import dotenv from "dotenv";
-dotenv.config();
 const PORT = process.env.PORT || 5000;
-const FONTEND = process.env.FONT_END_ENV;
-// import activityRouter from "./routers/activity.router.js";
-// import restaurantRouter from "./routers/restaurant.router.js";
-import authRouter from "./routers/auth.router.js";
-import cors from "cors";
 
-app.use(
-  cors({
-    origin: [FONTEND, "http://localhost:5173", "127.0.0.1:5173"],
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-access-token"],
-  })
-);
-
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://26.123.149.229:5173",
+    "http://172.19.0.1:5173"
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({extended:true}));
 
-app.get("/", (req, res) => {
-  res.send("Restaurant Restful API hbrhb");
-});
-// app.use("/api/v1/restaurant", restaurantRouter);
-app.use("/api/v1/auth", authRouter);
-app.use("/api/v1/activity", activityRouter);
-app.listen(PORT, () => {
-  console.log("Listening to http://localhost:" + PORT);
-});
-
-import db from "./models/index.js";
-const role = db.Role;
-
-const initRole = () => {
-  role.create({ id: 1, name: "admin" });
-  role.create({ id: 2, name: "manager" });
-  role.create({ id: 3, name: "teacher" });
-  role.create({ id: 4, name: "judge" });
+const initializeDatabase = async () => {
+  try {
+    await db.sequelize.sync({ alter: true });
+    console.log("Database synchronized");
+    const Role = db.Role;
+    const count = await Role.count();
+    if (count === 0) {
+      await Role.bulkCreate([
+        { name: "user" },
+        { name: "moderator" },
+        { name: "admin" }
+      ]);
+      console.log("Default roles created");
+    } else {
+      console.log("Roles already exist, skipping creation");
+    }
+  } catch (error) {
+    console.error("Database initialization error:", error);
+  }
 };
 
-db.sequelize.sync({ force: false }).then(() => {
-  initRole();
-  console.log("Drop Sync");
+app.get('/', (req, res) => {
+  res.send('Restaurant Useful API')
+});
+
+app.use('/api/v1/restaurants', restaurantRoutes);
+app.use("/api/v1/auth", authRoutes);
+
+initializeDatabase().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+  });
 });

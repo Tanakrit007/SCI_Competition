@@ -1,84 +1,103 @@
-import jwt from "jsonwebtoken";
-import authConfig from "../config/auth.config.js";
-import db from "../models/index.js";
-import crypto from "crypto";
-
+import db from "../model/index.js";
 const User = db.User;
+const Role = db.Role;
+import bcrypt from "bcryptjs"; //ใช้ในการเข้ารหัสรหัสผ่าน
+import jwt from "jsonwebtoken"; //ใช้ในการแลกเปลี่ยนข้อมูลระหว่างเซิร์ฟเวอร์และไคลเอนต์
+import config from "../config/auth.config.js"; //ใช้ในการเข้าถึงค่า secret key สำหรับ JWT
 
-//Register
-const sigup = async (req, res) => {
-  const { email, password, type, name } = req.body;
+import { Op } from "sequelize"; //ใช้ในการจัดการกับการค้นหาข้อมูลในฐานข้อมูล
+
+const authController = {};
+
+authController.register = async (req, res) => {
   try {
-    //Checlk validation request
-    if (!email || !password || !type || !name) {
-      return res.status(400).send({ message: "ข้อมูลไม่ครบ" });
+    const { username, name, email, password } = req.body;
+    if (!username || !name || !email || !password) {
+      return res.status(400).json({ message: "Username, Name, Email or Password can not be empty!" });
     }
 
-    const allowNullType = ["admin", "teacher", "judge"];
-    if (!allowNullType.includes(type)) {
-      return res.status(400).send({
-        message:
-          "ข้อมูลประเภทผู้ใช้ไม่ถูกต้องต้องเป็น admin , teacher หรือ judge",
-      });
+    const user = await User.findOne({ where: { username } });
+    if (user) {
+      return res.status(400).json({ message: "Username already exists!" });
     }
 
-    if (type === "teacher" && (!school || !phone)) {
-      return res
-        .status(400)
-        .send({ message: "ข้อมูลไม่ครบอาจารย์ต้องใส่ school และ phone ด้วย" });
-    }
-
-    //check if user already exists
-    const existingUser = await User.findOne({ where: { email: email } });
-    if (existingUser) {
-      return res.status(400).send({ message: "โง่เอ้ยเขาใช้ email นี้ไปแล้ว" });
-    }
-
-    //Create user object based on type
-    const userData = {
-      name: name,
-      email: email,
-      password: password,
-      type: type,
+    const newUser = {
+      username,
+      name,
+      email,
+      password: bcrypt.hashSync(password, 8),
     };
-    if (type === "teacher") {
-      userData.school = school;
-      userData.phone = phone;
+
+    const createdUser = await User.create(newUser);
+
+    if (req.body.roles) {
+      const roles = await Role.findAll({
+        where: {
+          name: { [Op.or]: req.body.roles },
+        },
+      });
+      if (roles.length === 0) {
+        return res.status(400).json({ message: "Role not found!" });
+      }
+      await createdUser.setRoles(roles);
+    } else {
+      await createdUser.setRoles([1]);
     }
 
-    //create new user
-    const newUser = await User.create(userData);
-
-    //If user is a teacher, create and send verification email
-    if (type === "teacher") {
-      try {
-        //create verification token
-        const token = crypto.randomBytes(32).toString("hex");
-        const verification = await db.VerificationToken.create({
-          token: token,
-          userId: user.id,
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 1 hour
-        });
-      } catch (error) {}
-    }
-
-    res.status(201).send({
-      message:
-        userData.type === "teacher"
-          ? "Registration successful. Please verify your email."
-          : "User Registration successful.",
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        type: user.type,
-        ...(user.type === "teacher" && {
-          school: user.school,
-          phone: user.phone,
-        }),
-      },
-    });
+    return res.status(201).json({ message: "User was registered successfully!" });
   } catch (error) {
-    return res.status(500).send({ message: error.message });
+    console.error("Register error:", error);
+    return res.status(500).json({
+      message: error.message || "Something error while create the user",
+    });
   }
 };
+
+authController.signin = async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    res.status(400).send({ message: "Username or Password are missing!" });
+    return;
+  }
+  // Select * from user where username = username
+  await User.findOne({ where: { username } })
+   .then((user) => {
+      if (!user) {
+        res.status(404).send({ message: "User not found!" });
+        return;
+      }
+      // Check password
+      const isPasswordValid = bcrypt.compareSync(password, user.password);
+      if (!isPasswordValid) {
+        res.status(401).send({ accessToken: null, message: "Invalid Password!" });
+        return;
+      }
+      // Create token
+      const token = jwt.sign({ id: user.username }, config.secret, {
+        expiresIn: 86400, // 24 hours
+      });
+      // Get roles
+      const authorities = [];
+      user.getRoles().then((roles) => {
+        for (let i = 0; i < roles.length; i++) {
+          authorities.push("ROLE_" + roles[i].name.toUpperCase());
+        }
+        res.status(200).send({
+          accessToken: token,
+          roles: authorities,
+          userInfo: {
+            username: user.username,
+            name: user.name,
+            email: user.email,
+          },
+        });
+      });
+    })
+    .catch((error) => {
+      res.status(500).send({ message: error.message || "Something error while signin" });
+    }); 
+};
+
+
+
+export default authController;
