@@ -1,24 +1,31 @@
-import axios from "axios";
+import api from "./api.js";
+import tokenService from "./token.service.js";
 
-const API_URL = "https://restaurentdocker-auth2.onrender.com/api/v1/auth/";
+const AUTH_API = "/auth";
 
-const login = (username, password) => {
-  return axios.post(
-    API_URL + "signin",
-    { username, password },
-    {
-      headers: { "Content-Type": "application/json" },
-      withCredentials: true,
-    }
-  );
+const register = async (userData) => {
+  return await api.post(API_URL + /signup, userData);
 };
 
-const register = (data) => {
-  return axios.post(API_URL + "register", data, {
-    headers: { "Content-Type": "application/json" },
-    withCredentials: true,
-  });
+const login = async (username, password) => {
+  const response = await api.post(`${AUTH_API}/signin`, { username, password });
+
+  // save user data to local storage
+  if (response.data.accessToken) {
+    tokenService.setUser(response.data);
+  }
+
+  return response;
 };
 
-const authService = { login, register };
+const logout = () => {
+  tokenService.removeUser();
+};
+
+const authService = {
+  register,
+  login,
+  logout,
+};
+
 export default authService;

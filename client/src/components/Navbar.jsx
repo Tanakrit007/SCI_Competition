@@ -1,11 +1,11 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import AuthService from "../service/auth.service";
 import Swal from "sweetalert2";
 import { useAuthContext } from "../context/AuthContext";
 
+
 const Navbar = () => {
-  const { user, logout } = useAuthContext(); // ใช้ logout จาก context
+  const { user, logout } = useAuthContext();
   const isLoggedIn = !!user;
   const navigate = useNavigate();
 
@@ -35,6 +35,7 @@ const Navbar = () => {
   return (
     <div className="navbar bg-base-100 shadow-sm">
       <div className="navbar-start">
+        {/* Dropdown menu (hamburger) */}
         <div className="dropdown">
           <div tabIndex={0} role="button" className="btn btn-ghost btn-circle">
             <svg
@@ -54,7 +55,7 @@ const Navbar = () => {
           </div>
           <ul
             tabIndex={0}
-            className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow"
+            className="menu menu-sm dropdown-content bg-base-100 rounded-box z-10 mt-3 w-52 p-2 shadow"
           >
             {MenuItem.map((item, index) => (
               <li key={index}>
@@ -68,11 +69,13 @@ const Navbar = () => {
           </ul>
         </div>
       </div>
+
       <div className="navbar-center">
         <Link to="/" className="btn btn-ghost text-xl">
           Grab Restaurant
         </Link>
       </div>
+
       <div className="navbar-end space-x-2">
         <Link to="/add-restaurant" className="btn btn-outline btn-primary">
           Add restaurant
@@ -95,4 +98,5 @@ const Navbar = () => {
     </div>
   );
 };
+
 export default Navbar;
