@@ -1,37 +1,24 @@
-import api from "./api";
-import Tokenservice from "./token.service";
+import axios from "axios";
 
-const API_URL = import.meta.env.VITE_AUTH_API;
+const API_URL = "https://restaurentdocker-auth2.onrender.com/api/v1/auth/";
 
-const register = async (username, name, email, password) => {
-    return await api.post(API_URL + "/register", {
-        username,
-        name,
-        email,
-        password
-    });
-};
-
-const login = async (username, password) => {
-    const response = await api.post(API_URL + "/signin", {
-        username,
-        password
-    });
-    if (response.data.accessToken) {
-        Tokenservice.setUser(response.data);
+const login = (username, password) => {
+  return axios.post(
+    API_URL + "signin",
+    { username, password },
+    {
+      headers: { "Content-Type": "application/json" },
+      withCredentials: true,
     }
-    return response;
+  );
 };
 
-const logout = () => {
-    Tokenservice.removeUser();
-    window.location.href = "/login"; // เพิ่ม redirect ไปหน้า login หลัง logout
+const register = (data) => {
+  return axios.post(API_URL + "register", data, {
+    headers: { "Content-Type": "application/json" },
+    withCredentials: true,
+  });
 };
 
-const AuthService = {
-    register,
-    login,
-    logout
-};
-
-export default AuthService;
+const authService = { login, register };
+export default authService;
